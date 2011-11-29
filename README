@@ -1,0 +1,36 @@
+
+DAMSON stands for Data Markup in JSON.
+
+It's a highly flexible template language where JSON documents produce
+text output.
+
+At it's core is a registry of handler functions that process JSON
+objects.  Every JSON object in a DAMSON document should have a 'type'
+value corresponding to an entry in the DAMSON registry.
+
+A multi-lingual HelloWorld example:
+
+	var DAMSON = require('./damson')
+
+	var siteLanguage = 'EN';
+
+	function renderText(node) {
+		return node[siteLanguage];
+	}
+
+	DAMSON.register('text', renderText);
+
+	DAMSON.render({type:'text', EN: 'Hello World', FR: 'Bonjour'});
+
+Nodes that do not have a type, or do not have any handlers for that
+type, will produce no output.
+
+If multiple handlers are registered for the same type, they all run,
+in the order they were registered, and their output is concatentated.
+
+Simple values found in a DAMSON document (strings, booleans, numbers)
+are simply concatenated.
+
+Arrays in a DAMSON document have each member rendered and
+concatenated.
+
