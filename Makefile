@@ -2,8 +2,8 @@
 all:
 	coffee -c *.coffee
 
-test:
-	coffee test.coffee
+test: all
+	for f in $(shell ls tests/*.coffee); do echo -n $$f ": "; coffee $$f; done
 
 clean:
 	rm *.js
