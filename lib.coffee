@@ -2,7 +2,6 @@
 OBJECT_RE = /\[object (\w+)\]/
 
 Object.Keys = (o, inherited = false) -> # Object.Keys(/o/, [/inherited/]) - get a list of key names
-	# by default, does not include properties inherited from a prototype
 	keys = []; j = 0
 	for i of o
 		if inherited or o.hasOwnProperty(i)
@@ -10,7 +9,6 @@ Object.Keys = (o, inherited = false) -> # Object.Keys(/o/, [/inherited/]) - get 
 	keys
 
 Object.Extend = (a, b, k) -> # Object.Extend(a, b, [k]) - merge values from b into a
-	# if k is present, it should be an array of property names
 	if Object::toString.apply(k) is "[object Array]" # cant use Object.IsArray yet
 		for i of k
 			a[k[i]] = b[k[i]] unless b[k[i]] is undefined
@@ -33,11 +31,8 @@ Object.Extend Object,
 			when Object.IsType o, "RegExp" then "regexp"
 			when String(o) in ["true", "false"] then "boolean"
 			when Object.IsError o then "error"
-			when Object.IsObject o
-				if "setInterval" of o # same crude method that jQuery uses
-					"window"
-				else
-					"object"
+			when Object.IsWindow o then "window"
+			when Object.IsObject o then "object"
 	IsType: (o,T) -> # Object.IsType(o,T) - true if object o is of type T (directly or indirectly)
 		if o == null
 			o is T
@@ -63,8 +58,8 @@ Object.Extend Object,
 		o? and o.nodeType is 11
 	IsArray: (o) -> # Object.IsArray(o) - true if object is an Array (or inherits Array)
 		o? and (Object.ToString(o) is "[object Array]" or Object.IsType(o, Array))
-	IsError: (o) ->
-		o? and o.constructor?.name is "Error"
+	IsError: (o) -> o?.constructor?.name is "Error"
+	IsWindow: (o) -> "setInterval" of o
 	IsObject: (o) -> # Object.IsObject(o) - true if a is an object
 		o? and typeof o is "object" and Object.ToString(o) is "[object Object]"
 	IsDefined: (o) -> # Object.IsDefined(o) - true if a is not null nor undefined
@@ -104,92 +99,6 @@ Object.Extend Object,
 					return false
 		return true
 
-Object.Extend Function,
-	Empty: () -> # the empty function
-	Bound: (f, t, args = []) -> # Function.Bound(/f/, /t/) - whenever /f/ is called, _this_ is /t/
-		if "bind" of f
-			args.splice 0, 0, t
-			r = f.bind.apply f, args
-		else
-			r = (a...) ->
-				if args.length > 0
-					a = args
-				f.apply t, args
-		r.toString = () ->
-			"bound-method of #{t}.#{f.name}"
-		r
-	Trace: (f, label, tracer = log) -> # Function.Trace(/f/, /label/) - log calls to /f/
-		r = (a...) ->
-			tracer "#{@name or Object.Type(@)}.#{label or f.name}(", a, ")"
-			f.apply @, a
-		tracer "Function.Trace: #{label or f.name} created."
-		r.toString = f.toString
-		r
-	NotNull: (x) -> x != null
-	NotEmpty: (x) -> x not in ["", null]
-	IndexFound: (x) -> x > -1
-	ReduceAnd: (x) -> x and @
-	UpperLimit: (x) -> (y) -> Math.min(x, y)
-	LowerLimit: (x) -> (y) -> Math.max(x, y)
-	Px: (d) -> () -> Number.Px(@,d)
-
-Object.Extend Array,
-	Coalesce: (a...) -> # Array.Coalesce - returns the first non-null argument
-		if Object.IsArray(a[0])
-			Array.Coalesce a[0]...
-		else
-			for i in a
-				return i if i?
-	Extend: (a, b) -> # Array.Extend - Array.Extend([a...],[b...]) -> [a..., b...]
-		j = a.length
-		for i in b
-			a[j++] = i
-		a
-	Compact: (a, s = "", r = []) ->
-		if Object.IsSimple(a) or not Object.IsArray(a)
-			return a
-		for i in a
-			if not Object.IsDefined(i) then continue
-			else if Object.IsSimple(i) then s += i
-			else if Object.IsArray(i)
-				ret = Array.Compact(i, s, r)
-				if Object.IsString(ret)
-					s = ret
-				else if Object.IsArray(ret)
-					r = ret
-					s = ""
-			else
-				if s.length > 0
-					r.push s
-					s = ""
-				r.push i
-		if r.length is 0
-			return s
-		if s.length > 0
-			r.push s
-		return r
-	Search: (a, f = ((x)->true), from = 0, to = -1) -> # UNTESTED: just noodling for now
-		if not Object.IsArray(a)
-			return
-		n = a.length
-		if from < 0 then from += n
-		if to < 0 then to += n
-		for i in [from..to]
-			if f(a[i]) then return a[i]
-		return null
-
-Object.Extend Number,
-	Px: (x, d=0) ->
-		# Px(/x/, /delta/=0) - convert a number-ish x to pixels
-		x? and (parseInt(x,10)+(d|0))+"px"
-	# mappable versions of max() and min()
-	AtLeast: (x) ->
-		(y) ->
-			Math.max parseFloat(y or 0), x
-	AtMost: (x) ->
-		(y) ->
-			Math.min parseFloat(y or 0), x
-
 Object.Extend String,
 	PadLeft: (s, n, c = " ") -> # String.PadLeft(string, width, fill=" ")
 		while s.length < n
@@ -214,4 +123,97 @@ Object.Extend String,
 			a = (a + s.charCodeAt(i)) % 65521
 			b = (b + a) % 65521
 		return (b << 16) | a
+	Builder: () -> # String.Builder - builds a string
+		if Object.IsWindow(@) then return new String.Builder()
+		items = []
+		@length   = 0
+		@append   = (s) => items.push s; @length += s?.toString().length|0
+		@prepend  = (s) => items.splice 0,0,s; @length += s?.toString().length|0
+		@clear    = ( ) => items = []; @length = 0
+		@replace  = (s) => items = [s]; @length = s?.toString().length|0 
+		@toString = ( ) => items.join("")
+		@
+
+Object.Extend Function,
+	Empty: () -> # the empty function
+	Bound: (f, t, args = []) -> # Function.Bound(/f/, /t/) - whenever /f/ is called, _this_ is /t/
+		if "bind" of f
+			args.splice 0, 0, t
+			r = f.bind.apply f, args
+		else
+			r = (a...) ->
+				if args.length > 0
+					a = args
+				f.apply t, args
+		r.toString = () ->
+			"bound-method of #{t}.#{f.name}"
+		r
+	Trace: (f, label, tracer = (x)->console.log.call(console,x)) -> # Function.Trace(/f/, /label/) - log calls to /f/
+		r = (a...) ->
+			tracer "#{@name or Object.Type(@)}.#{label or f.name}(", a, ")"
+			f.apply @, a
+		tracer "Function.Trace: #{label or f.name} created."
+		r.toString = f.toString
+		r
+	NotNull: (x) -> x != null
+	NotEmpty: (x) -> x not in ["", null]
+	IndexFound: (x) -> x > -1
+	ReduceAnd: (x) -> x and @
+	UpperLimit: (x) -> (y) -> Math.min(x, y)
+	LowerLimit: (x) -> (y) -> Math.max(x, y)
+	Px: (d) -> () -> Number.Px(@,d)
+
+Object.Extend Array,
+	Coalesce: (a...) -> # Array.Coalesce - returns the first non-null argument
+		if Object.IsArray(a[0])
+			Array.Coalesce a[0]...
+		else
+			for i in a
+				return i if i?
+	Extend: (a, b) -> # Array.Extend - Array.Extend([a...],[b...]) -> [a0,a1...,b0,b1...]
+		j = a.length
+		for i in b
+			a[j++] = i
+		a
+	Compact: (a, buffer = new String.Builder(), into = [], topLevel = true) -> # Array.Compact reduces /a/ by joining adjacent stringy items
+		if not Object.IsArray(a)
+			return a
+		for i in a
+			switch true
+				when not Object.IsDefined(i) then continue
+				when Object.IsSimple(i) then buffer.append(i)
+				when Object.IsArray(i) then Array.Compact(i, buffer, into, false)
+				else
+					into.push buffer.toString() if buffer.length > 0
+					into.push i
+					buffer.clear()
+		if into.length is 0
+			return buffer.toString()
+		if buffer.length > 0 and topLevel
+			into.push buffer.toString()
+			buffer.clear()
+		return into
+	Search: (a, f = ((x)->true), from = 0, to = -1) -> # UNTESTED: just noodling for now
+		if not Object.IsArray(a)
+			return
+		n = a.length
+		if from < 0 then from += n
+		if to < 0 then to += n
+		for i in [from..to]
+			if f.call(a[i], a[i])
+				return a[i]
+		return null
+
+Object.Extend Number,
+	Px: (x, d=0) ->
+		# Px(/x/, /delta/=0) - convert a number-ish x to pixels
+		x? and (parseInt(x,10)+(d|0))+"px"
+	# mappable versions of max() and min()
+	AtLeast: (x) ->
+		(y) ->
+			Math.max parseFloat(y or 0), x
+	AtMost: (x) ->
+		(y) ->
+			Math.min parseFloat(y or 0), x
+
 
