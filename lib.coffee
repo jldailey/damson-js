@@ -134,14 +134,13 @@ Object.Extend Function,
 	Px: (d) -> () -> Number.Px(@,d)
 
 Object.Extend Array,
-	Coalesce: (a...) ->
-		# Array.Coalesce - returns the first non-null argument
+	Coalesce: (a...) -> # Array.Coalesce - returns the first non-null argument
 		if Object.IsArray(a[0])
 			Array.Coalesce a[0]...
 		else
 			for i in a
 				return i if i?
-	Extend: (a, b) ->
+	Extend: (a, b) -> # Array.Extend - Array.Extend([a...],[b...]) -> [a..., b...]
 		j = a.length
 		for i in b
 			a[j++] = i
@@ -169,6 +168,15 @@ Object.Extend Array,
 		if s.length > 0
 			r.push s
 		return r
+	Search: (a, f = ((x)->true), from = 0, to = -1) -> # UNTESTED: just noodling for now
+		if not Object.IsArray(a)
+			return
+		n = a.length
+		if from < 0 then from += n
+		if to < 0 then to += n
+		for i in [from..to]
+			if f(a[i]) then return a[i]
+		return null
 
 Object.Extend Number,
 	Px: (x, d=0) ->
